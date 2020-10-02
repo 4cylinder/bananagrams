@@ -1,0 +1,31 @@
+<!-- templates/index.html -->
+{% extends 'base.html' %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+{% if user.is_authenticated %}
+  <!-- Page content -->
+  <div class="main">
+    {% if activeGames|length > 0 %}
+      {% include "active_game.html" %}
+    {% else %}
+      Hi {{ user.username }}! You aren't playing a game right now. Would you like to create one?
+    {% endif %}
+  </div>
+  <!-- /#page-content-wrapper -->
+
+{% else %}
+  <p>You are not logged in</p>
+  <a class="btn btn-primary" href="{% url 'login' %}">Log In</a>
+  <a class="btn btn-info" href="{% url 'register' %}">Sign up</a>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(function() {
+  $('#navbarCurrentGame').addClass('active');
+});
+</script>
+{% endblock %}
