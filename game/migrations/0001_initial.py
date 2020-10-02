@@ -39,7 +39,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('display_name', models.CharField(max_length=20)),
-                ('active_game', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='grams.game')),
+                ('active_game', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='game.game')),
                 ('user', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
             ],
         ),

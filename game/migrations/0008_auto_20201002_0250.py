@@ -7,7 +7,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('grams', '0007_auto_20201002_0151'),
+        ('game', '0007_auto_20201002_0151'),
     ]
 
     operations = [
@@ -26,8 +26,8 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('info', models.TextField()),
-                ('game', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='grams.game')),
-                ('player', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='grams.player')),
+                ('game', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='game.game')),
+                ('player', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='game.player')),
             ],
         ),
     ]

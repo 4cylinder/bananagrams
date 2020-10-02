@@ -7,18 +7,20 @@ from django.shortcuts import render
 from .utils import *
 
 def index(request):
-    activePlayer = Player.objects.get(user=request.user, active=True)
-    if activePlayer:
+    try:
+        activePlayer = Player.objects.get(user=request.user, active=True)
         activeGame = activePlayer.game
         context = {
             'player': activePlayer,
             'game': activeGame
         }
         return render(request, 'index.html', context)
-    else:
+    except:
         return render(request, 'index.html')
 
-def createNewGame(request, numPlayers, gameName='Bananagrams'):
+def createNewGame(request):
+    gameName = request.POST['gameName']
+    numPlayers = request.POST['numPlayers']
     newGame = Game(game_name=gameName, num_players=numPlayers, active=True)
     newGame.save()
     host = Player(user=request.user, game=newGame, active=True, is_host=True)

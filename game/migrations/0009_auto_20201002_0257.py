@@ -7,7 +7,7 @@ import django.utils.timezone
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('grams', '0008_auto_20201002_0250'),
+        ('game', '0008_auto_20201002_0250'),
     ]
 
     operations = [

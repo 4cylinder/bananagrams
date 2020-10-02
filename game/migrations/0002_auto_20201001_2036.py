@@ -7,7 +7,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('grams', '0001_initial'),
+        ('game', '0001_initial'),
     ]
 
     operations = [
@@ -19,6 +19,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='player',
             name='active_game',
-            field=models.ForeignKey(blank=True, on_delete=django.db.models.deletion.CASCADE, to='grams.game'),
+            field=models.ForeignKey(blank=True, on_delete=django.db.models.deletion.CASCADE, to='game.game'),
         ),
     ]
