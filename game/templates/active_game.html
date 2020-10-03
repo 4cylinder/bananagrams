@@ -1,0 +1,71 @@
+<div class='row'>
+  <div class="mr-auto">
+    Share this lobby URL for others to join (click to copy):
+    <a href="#" id='joinlink'>{{ request.get_host }}{% url 'game:join' game.url_key %}</a>
+  </div>
+  <div id="copyAlert" class="ml-auto alert alert-success alert-dismissible fade show" role="alert" style="display: none">
+    Link copied.
+    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+      <span aria-hidden="true">&times;</span>
+    </button>
+  </div>
+</div>
+
+<div class='row'>
+  <div class='col-9'>
+    <div class='container'>
+      <canvas id='grid'></canvas>
+      <div class='row'></div>
+    </div>
+    
+  </div>
+  <div class='col-3' id='event-panel'>
+    <div class="panel panel-default">
+      <div class="panel-heading">
+        <h4 class="panel-title">Game Progress</h4>
+      </div>
+      <div class="panel-body" id='event-container'></div>
+    </div>
+    <div>
+      {% if player.is_host %}
+      <button class='btn btn-primary' id='startBtn' disabled>Start Game</button>
+      {% endif %}
+
+      <button class='btn btn-warning' id='peelBtn' disabled>Peel</button>
+    </div>
+  </div>
+</div>
+
+{% block extra_js %}
+{% load static %}
+  <script src="{% static "js/game.js" %}"></script>
+  <script>
+  $(function() {
+    var eventUrl = "{% url 'game:events' game.pk %}";
+    var playerStateUrl = "{% url 'game:update' game.pk %}"
+    var startUrl = "{% url 'game:start' game.pk %}"
+    var interval = pollForEvents(eventUrl, playerStateUrl);
+
+    $('#joinlink').click(function() {
+      var joinlink = $(this).text();
+      copyToClipboard(joinlink);
+      $('#copyAlert').show();
+    });
+
+    $('#startBtn').click(function() {
+      $.get(startUrl, function(result) {
+        if (result == 'STARTED') {
+          console.log("Started game");
+        } else {
+          console.err(result);
+        }
+      });
+    });
+  });
+  </script>
+{% endblock %}
+
+{% block extra_css %}
+{% load static %}
+  <link rel="stylesheet" href="{% static "css/game.css" %}">
+{% endblock %}

@@ -1,0 +1,24 @@
+.game-event {
+    text-align: left;
+}
+
+#event-panel .panel-heading, .panel-body {
+    border: black;
+    border-width: thin;
+    border-style: solid;
+}
+
+#event-panel {
+    flex: 1 1 auto;
+    bottom: 0;
+    height: 100%
+}
+
+#grid {
+    background-color: white; 
+    width: 100%;
+    height: auto;
+    border-style: solid;
+    border: 1px solid black;
+    border-width: thin;
+}

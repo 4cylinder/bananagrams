@@ -1,11 +1,22 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 
 # Create your views here.
 from django.http import HttpResponse, JsonResponse
-from .models import Player, Game
+from .models import Player, Game, Event, EventTypes
 from django.shortcuts import render
 from .utils import *
+from .forms import CreateGameForm
+from datetime import datetime
+from django.contrib.auth.decorators import login_required
+from .signals import event_signal
 
+def home(request):
+    if request.user.is_authenticated:
+        return redirect('game:index')
+    else:
+        return render(request, 'index.html')
+
+@login_required()
 def index(request):
     try:
         activePlayer = Player.objects.get(user=request.user, active=True)
@@ -15,43 +26,48 @@ def index(request):
             'game': activeGame
         }
         return render(request, 'index.html', context)
-    except:
-        return render(request, 'index.html')
+    except Exception as e:
+        print(e)
+        return render(request, 'index.html', {'create_game_form': CreateGameForm()})
 
+@login_required
 def createNewGame(request):
-    gameName = request.POST['gameName']
-    numPlayers = request.POST['numPlayers']
+    gameName = request.POST['game_name']
+    numPlayers = request.POST['player_count']
     newGame = Game(game_name=gameName, num_players=numPlayers, active=True)
     newGame.save()
     host = Player(user=request.user, game=newGame, active=True, is_host=True)
     host.save()
-    context = {
-        'player': host,
-        'game': newGame
-    }
-    return render(request, 'index.html', context)
+    event_signal.send(sender=None, user=request.user, game=newGame, eventType=EventTypes.EVENT_CREATE)
+    return redirect('game:index')
 
-def checkGameAvailability(request, urlKey):
+@login_required
+def checkGameAvailabilityByUrl(request, urlKey):
     game = Game.objects.get(url_key=url_key, active=True)
     if game:
-        presentPlayers = Player.objects.all().filter(game=game, active=True)
-        if len(presentPlayers) == game.num_players:
-            return HttpResponse("GAME IS FULL")
-        elif len(presentPlayers) < game.num_players:
-            return HttpResponse("CAN JOIN GAME")
+        return HttpResponse("CAN JOIN GAME" if numPlayersInGame(game) < game.num_players else "GAME IS FULL")
     else:
         return HttpResponse("GAME DOES NOT EXIST")
 
-def joinGame(request, urlKey):
-    game = Game.objects.get(url_key=url_key, active=True)
-    guest = Player(user=request.user, game=game, active=True, is_host=False)
-    guest.save()
-    context = {
-        'player': guest,
-        'game': game
-    }
-    return render(request, 'index.html', context)
+def numPlayersInGame(game):
+    presentPlayers = Player.objects.all().filter(game=game, active=True)
+    return len(presentPlayers)
 
+@login_required
+def joinGame(request, urlKey):
+    game = Game.objects.get(url_key=urlKey, active=True)
+    existingPlayers = numPlayersInGame(game)
+    if existingPlayers < game.num_players:
+        guest, created = Player.objects.get_or_create(user=request.user, game=game, active=True, is_host=False)
+        if created: guest.save()
+        event_signal.send(sender=None, user=request.user, game=game, eventType=EventTypes.EVENT_JOIN)
+        if existingPlayers == game.num_players - 1:
+            event_signal.send(sender=None, user=request.user, game=game, eventType=EventTypes.EVENT_FULL)
+        return redirect('game:index')
+    else:
+        return HttpResponse("GAME IS FULL")
+
+@login_required
 def startGame(request, gameId):
     game = Game.objects.get(pk=gameId)
     # check that there are enough players
@@ -62,7 +78,8 @@ def startGame(request, gameId):
     startTileCount = getStartTileCount(game.num_players)
     distributeTiles(startTileCount, game)
 
-    return HttpResponse("GAME STARTED")
+    event_signal.send(sender=None, user=request.user, game=game, eventType=EventTypes.EVENT_START)
+    return HttpResponse("STARTED")
 
 def distributeTiles(numTiles, game):
     players = Player.objects.select_for_update().all().filter(game=game, active=True)
@@ -77,6 +94,7 @@ def distributeTiles(numTiles, game):
 
 # Player has finished their grid and clicks PEEL
 # When a player peels, ALL players must take one tile
+@login_required
 def peel(request, gameId):
     game = Game.objects.select_for_update().get(pk=gameId)
     peeler = Player.objects.select_for_update().get(user=request.user, game=game)
@@ -84,12 +102,14 @@ def peel(request, gameId):
     if validatePeel(peeler.grid, peeler.rack, newGrid):
         peeler.grid = newGrid
         peeler.rack = ""
+        peeler.save()
+        distributeTiles(1, game)
+        event_signal.send(sender=None, user=request.user, game=game, eventType=EventTypes.EVENT_PEEL)
     else:
         return HttpResponse("Invalid Move")
-    
-    distributeTiles(1, game)
 
 # When a player dumps, they put one tile back and take 3 more (if available)
+@login_required
 def dump(request, gameId, toDump):
     game = Game.objects.select_for_update().get(pk=gameId)
     tiles = list(game.remaining_tiles)
@@ -104,26 +124,49 @@ def dump(request, gameId, toDump):
     tiles.append(toDump)
     game.remaining_tiles = tiles
     game.save()
-    dumper.rack = rack
+    dumper.rack = ''.join(rack)
     dumper.save()
+
+    event_signal.send(sender=None, user=request.user, game=game, eventType=EventTypes.EVENT_DUMP)
     return HttpResponse('Dumped')
 
-# Front end polls this to ensure that peel/dumps properly update everyone
-def updateGameInfo(request, gameId):
-    game = Game.objects.select_for_update().get(pk=gameId)
-    player = Player.objects.select_for_update().get(user=request.user, game=game)
+# poll for game events
+@login_required
+def getGameEvents(request, gameId):
+    game = Game.objects.get(pk=gameId)
+    event = Event.objects.all().filter(game=game).order_by('-event_time')[0]
+
+    return JsonResponse({
+        'tilesLeft': len(game.remaining_tiles),
+        'event': {
+            'time': event.event_time,
+            'info': event.event_info,
+            'event_type': event.event_type
+        }
+    })
+
+# update player state if an event requires it (peel, bananas, dump)
+@login_required
+def updatePlayerState(request, gameId):
+    game = Game.objects.get(pk=gameId)
+    player = Player.objects.get(user=request.user, game=game)
     return JsonResponse({
         'rack': player.rack,
-        'grid': player.grid,
-        'tilesLeft': len(game.remaining_tiles)
+        'active': player.active
     })
 
 # No more tiles to distribute, and one player finishing up = Bananas
+@login_required
 def bananas(request, gameId):
     game = Game.objects.select_for_update().get(pk=gameId)
     caller = Player.objects.select_for_update().get(user=request.user, game=game)
     newGrid = request.POST['grid']
+    event_signal.send(sender=None, user=request.user, game=game, eventType=EventTypes.EVENT_BANANAS)
+
     if validateBananas(newGrid):
+        game.end_time = datetime.now()
+        game.save()
+        event_signal.send(sender=None, user=request.user, game=game, eventType=EventTypes.EVENT_WIN)
         return HttpResponse("You win!")
     else:
         return HttpResponse("Rotten Banana")

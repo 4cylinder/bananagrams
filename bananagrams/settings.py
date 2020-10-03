@@ -123,5 +123,9 @@ STATIC_URL = '/static/'
 
 CRISPY_TEMPLATE_PACK="bootstrap4"
 
-LOGIN_REDIRECT_URL = '/game'
+LOGIN_REDIRECT_URL = '/index'
 LOGOUT_REDIRECT_URL = '/'
+
+STATICFILES_DIRS = [
+    BASE_DIR / "static",
+]
